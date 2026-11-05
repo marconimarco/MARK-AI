@@ -1,0 +1,10 @@
+huggingface_hub
+requests
+gradio==6.9.0
+llama-cpp-python --extra-index-url https://github.io
+sentence-transformers
+faiss-cpu
+pypdf
+edge-tts
+static-ffmpeg
+git+https://github.com
