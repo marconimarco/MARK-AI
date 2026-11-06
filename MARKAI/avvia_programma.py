@@ -48,10 +48,9 @@ try:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # ========================================================
-    # CONFIGURAZIONE AUTOMATICA LINK HUGGING FACE
-    # Sostituisci queste due stringhe con i tuoi dati reali
+    # CONFIGURAZIONE HUGGING FACE
     # ========================================================
-    REPO_ID = "IL_TUO_USERNAME_HF/MARK-AI"
+    REPO_ID = "DanDanDan9/MARK-AI"
     FILENAME = "qwen2.5-3b-instruct-q4_k_m.gguf"
     # ========================================================
 
@@ -66,7 +65,9 @@ try:
             
             try:
                 print(f"[MARK] Controllo/Download del modello {FILENAME} da Hugging Face...")
-                percorso_modello_scaricato = hf_hub_download(repo_id=REPO_ID, filename=FILENAME)
+                # Usa il token se presente nell'ambiente (per repo privati)
+                token = os.environ.get("HF_TOKEN", None)
+                percorso_modello_scaricato = hf_hub_download(repo_id=REPO_ID, filename=FILENAME, token=token)
             except Exception as e:
                 print(f"[ERRORE] Download da Hugging Face fallito: {e}")
                 return None
@@ -102,19 +103,24 @@ try:
             chunks = [testo[i:i + 500].strip() for i in range(0, len(testo), 450) if testo[i:i+500].strip()]
             if not chunks: return "Vuoto."
             emb = np.array(embedder.encode(chunks)).astype("float32")
-            if indice_faiss is None: indice_faiss = faiss.IndexFlatL2(emb.shape)
+            if indice_faiss is None: indice_faiss = faiss.IndexFlatL2(emb.shape[1]) # Corretto: shape[1]
             indice_faiss.add(emb)
             chunks_documenti.extend(chunks)
             return f"{os.path.basename(file_path)}"
-        except: return "Errore."
+        except Exception as e: 
+            print(f"Errore RAG: {e}")
+            return "Errore."
 
     def cerca_nel_documento(domanda, k=3):
         if not RAG_DISPONIBILE or indice_faiss is None: return ""
         try:
             q_emb = np.array(embedder.encode([domanda])).astype("float32")
             _, indici = indice_faiss.search(q_emb, min(k, len(chunks_documenti)))
-            return "\n---\n".join(chunks_documenti[i] for i in indici if i < len(chunks_documenti))
-        except: return ""
+            # Corretto: indici[0] contiene gli ID, non 'indici'
+            return "\n---\n".join(chunks_documenti[i] for i in indici[0] if i < len(chunks_documenti))
+        except Exception as e:
+            print(f"Errore ricerca RAG: {e}")
+            return ""
 
     def svuota_documenti():
         global indice_faiss, chunks_documenti
